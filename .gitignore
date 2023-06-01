@@ -126,3 +126,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Add symlinks to dependency packages to simplify dependency management.
+/loralib
+/optimizer_KLS

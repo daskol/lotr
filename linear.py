@@ -14,6 +14,11 @@ class DLRTLinear(KLSLinear):
     linear layer trained with KLS-scheme.
     """
 
+    def __init__(self, in_features: int, out_features: int, bias: bool = True,
+                 device=None, dtype=None, rank=None, adaptive=True):
+        super().__init__(in_features, out_features, bias, device, dtype, rank,
+                         not adaptive)
+
 
 class Mode(Enum):
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import re
 from functools import partial
 from pathlib import Path
 
@@ -11,6 +12,13 @@ from transformers import AutoTokenizer, RobertaForSequenceClassification
 
 from linear import AdaptiveLoRaLinear
 from util import map_module
+
+RE_CORRECTION = re.compile(
+    r'/roberta/encoder/layer/\d+/attention/self/(value|query)/correction/.*')
+
+RE_HEAD = re.compile(r'/classifier/.*')
+
+RE_PATTERNS = (RE_CORRECTION, RE_HEAD)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +34,21 @@ def convert_model(model, rank=None, adaptive=True):
     return map_module(
         model, partial(convert_layer, rank=rank, adaptive=adaptive),
         r'/roberta/encoder/layer/\d+/attention/self/(value|query)')
+
+
+def mask_weights(model: T.nn.Module):
+    """Mask trainable weights only in classification head and in KLS-correction
+    in value and query of self-attention module.
+    """
+    for name, param in model.named_parameters():
+        name = '/' + name.replace('.', '/')
+        for pattern in RE_PATTERNS:
+            if pattern.match(name) is not None:
+                param.requires_grad = True
+                break
+        else:
+            param.requires_grad = False
+    return model
 
 
 def train(task: str, batch_size=1, rank=None, adaptive=True):
@@ -54,6 +77,7 @@ def train(task: str, batch_size=1, rank=None, adaptive=True):
     model_path = 'roberta-base'
     model = RobertaForSequenceClassification.from_pretrained(model_path)
     model = convert_model(model, rank, adaptive)
+    model = mask_weights(model)
 
     logger.info('initialize random number generator')
     bits = np.random.MT19937(42)

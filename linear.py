@@ -48,12 +48,16 @@ class AdaptiveLoRaLinear(T.nn.Module):
         self.out_features = out_features
         self.mode = Mode.S
 
-        # Initialize main weights (kernel + optinal bias).
+        # Initialize main weights (kernel + optinal bias). By default, these
+        # weights are not trainable.
         factory_kwargs = {'device': device, 'dtype': dtype}
         self.weight = Parameter(
-            T.empty((out_features, in_features), **factory_kwargs))
+            data=T.empty((out_features, in_features), **factory_kwargs),
+            requires_grad=False,
+        )
         if bias:
-            self.bias = Parameter(T.empty(out_features, **factory_kwargs))
+            self.bias = Parameter(T.empty(out_features, **factory_kwargs),
+                                  requires_grad=False)
         else:
             self.register_parameter('bias', None)
 

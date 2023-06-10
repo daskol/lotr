@@ -79,7 +79,7 @@ class AdaptiveLoRaLinear(T.nn.Module):
                                      device=device,
                                      dtype=dtype,
                                      rank=self.rank,
-                                     adaptive=not self.adaptive)
+                                     adaptive=self.adaptive)
 
         # NOTE Since we use DLRT as an addtive low-rank correction term, we
         # need to adjust initialization in such a way that correction does not

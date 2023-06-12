@@ -201,7 +201,8 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
 
     if enable_kls:
         logger.info('initialize DLRT-optimizer')
-        opt = KLSOptimizer(model, tau=1.0)
+        opt = KLSOptimizer(model, tau=1.0, KLS_optim=T.optim.AdamW,
+                           weight_decay=0.1)
         scheduler = T.optim.lr_scheduler.LambdaLR(opt.integrator, schedule_fn)
     else:
         logger.info('initialize AdamW-optimizer')
@@ -285,12 +286,29 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
         eval_metrics = eval_fn(model)
         logger.info('[%0d] eval metrics: %s', epoch + 1, eval_metrics)
 
+        # NOTE In COLA experiments we exit after the first epoch in order to
+        # speed up hyperparameter search.
+        return eval_metrics
+
 
 def main(args: Namespace):
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.INFO)
-    train(args.task, args.batch_size, args.num_epoches, args.enable_kls,
-          args.init_rank, True, args.lr, args.rank_tol)
+    from json import dump
+    lrs = [5e-6, 1e-5, 2e-5, 1e-4, 1e-3]
+    init_ranks = [1, 2, 5, 10, 20, 100, 200]
+    print('total', len(lrs) * len(init_ranks), 'experiments')
+    with open('cola.adamw.json', 'w') as fout:
+        for lr in lrs:
+            for init_rank in init_ranks:
+                aux = train(args.task, args.batch_size, args.num_epoches,
+                            args.enable_kls, init_rank, True, lr,
+                            args.rank_tol)
+                aux['lr'] = lr
+                aux['init_rank'] = init_rank
+                dump(aux, fout, ensure_ascii=False, indent=None)
+                fout.write('\n')
+                fout.flush()
 
 
 if __name__ == '__main__':

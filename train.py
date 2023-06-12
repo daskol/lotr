@@ -104,7 +104,23 @@ def set_step_mode(model: T.nn.Module, mode: Mode):
     model.classifier.out_proj.step = mode.name
 
 
-def apply_fn(batch: Dict[str, Any], model, mode: Mode = Mode.S,
+def make_schedule(lr: float, num_warmup_steps: int, num_train_steps: int):
+    """Function schedule_fn defines a learning rate schedule which constists of
+    two segments: linear growth from zero and linear decay to zero. This
+    schdule function is reported in original RoBERTa paper.
+    """
+    def schedule_fn(step: int):
+        if step <= num_warmup_steps:
+            return step * growth_rate
+        else:
+            return step * decay_rate + lr
+
+    growth_rate = lr / num_warmup_steps
+    decay_rate = -lr / num_train_steps
+    return schedule_fn
+
+
+def apply_fn(batch: Dict[str, Any], model, mode: Mode = Mode.S, *,
              enable_kls: bool = False) -> SequenceClassifierOutput:
     """Apply model to input batch in specific step mode for KLS-optimizer if
     KLS is enabled.
@@ -171,57 +187,37 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
         model = convert_model(model, rank, adaptive)
         model = mask_weights(model)
         model.layer = [*flatten_module(model).values()]
-
-    # TODO
-    from transformers import TrainingArguments, Trainer
-    num_train_steps = len(dataset['train']) * num_epoches // batch_size
-    num_warmup_steps = int(0.06 * num_train_steps)
-    args = TrainingArguments(output_dir='tmp',
-                             evaluation_strategy='epoch',
-                             per_device_train_batch_size=batch_size,
-                             per_device_eval_batch_size=batch_size,
-                             num_train_epochs=num_epoches,
-                             save_strategy='no',
-                             logging_strategy='epoch',
-                             log_level='warning',
-                             learning_rate=lr,
-                             weight_decay=0.1,
-                             adam_beta1=0.9,
-                             adam_beta2=0.98,
-                             adam_epsilon=1e-6,
-                             lr_scheduler_type='polynomial',
-                             warmup_steps=num_warmup_steps,
-                             push_to_hub=False)
-
-    metric = load_metric('glue', task)
-    trainer = Trainer(
-        model=model.to('cuda'),
-        args=args,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['validation'],
-        tokenizer=tokenizer,
-        compute_metrics=lambda x: metric.compute(
-            predictions=x.predictions.argmax(-1), references=x.label_ids))
-    trainer.train()
-    exit()
+    print(model)
 
     if T.cuda.is_available():
         logger.info('move model to CUDA device')
         model = model.to('cuda')
 
+    logger.info('make learning rate scheduler')
+    num_total_steps = len(dataset['train']) * num_epoches // batch_size
+    num_warmup_steps = int(0.06 * num_total_steps)
+    num_train_steps = num_total_steps - num_warmup_steps
+    schedule_fn = make_schedule(lr, num_warmup_steps, num_train_steps)
+
     if enable_kls:
         logger.info('initialize DLRT-optimizer')
-        opt = KLSOptimizer(model)
+        opt = KLSOptimizer(model, tau=1.0)
+        scheduler = T.optim.lr_scheduler.LambdaLR(opt.integrator, schedule_fn)
     else:
         logger.info('initialize AdamW-optimizer')
-        num_train_steps = len(dataset['train']) * num_epoches // batch_size
-        num_warmup_steps = int(0.06 * num_train_steps)
-        from transformers import get_polynomial_decay_schedule_with_warmup
-        opt = AdamW(model.parameters(), lr=lr, weight_decay=0.1)
-        scheduler = get_polynomial_decay_schedule_with_warmup(
-            opt,
-            num_warmup_steps=num_warmup_steps,
-            num_training_steps=num_train_steps)
+        named_params = [
+            (n, p) for n, p in model.named_parameters()
+            if 'LayerNorm' not in n and 'bias' not in n
+        ]
+        named_params = [
+            (n, p) for n, p in named_params if 'classifier' in n or (
+                'attention' in n and ('value' in n or 'query' in n))
+        ]
+        names, params = zip(*named_params)
+        logging.info('trainable weights are %s', names)
+        logging.info('total number of trainable weights is %d', len(params))
+        opt = AdamW(params, lr=1.0, weight_decay=0.1)
+        scheduler = T.optim.lr_scheduler.LambdaLR(opt, schedule_fn)
 
     logger.info('load evaluation metrics')
     metric = load_metric('glue', task)
@@ -237,11 +233,12 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
     logger.info('enter training loop: noepoches=%d', num_epoches)
     for epoch in range(num_epoches):
         logger.info('epoch #%02d begins', epoch)
+        #             .shuffle(generator=prng,
+        #                      keep_in_memory=True,
+        #                      load_from_cache_file=False) \
         batches = dataset['train'] \
-            .shuffle(generator=prng,
-                     keep_in_memory=True,
-                     load_from_cache_file=False) \
             .with_format('torch', device=model.device) \
+            .flatten_indices() \
             .iter(batch_size=batch_size, drop_last_batch=True)
 
         if getenv('INTERACTIVE', 'false').lower() == 'true':
@@ -250,9 +247,11 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
             batches = tqdm(batches, total=nobatches, unit='batch')
 
         model.train()
+        train_batch = None
         for it, batch in enumerate(batches):
+
             def loss_fn(mode: Mode = Mode.S):
-                output = apply_fn(batch, model, mode, enable_kls)
+                output = apply_fn(batch, model, mode, enable_kls=enable_kls)
                 return output.loss
 
             if enable_kls:
@@ -268,15 +267,19 @@ def train(task: str, batch_size=8, num_epoches=1, enable_kls=False, rank=1,
                 loss.backward()
                 # Make S-step.
                 opt.step(loss_fn)
+                scheduler.step()
             else:
+                model.zero_grad()
+                opt.zero_grad()
                 loss = loss_fn()
                 loss.backward()
                 opt.step()
                 scheduler.step()
 
-            if it % 2:
-                logger.info('[%02d:%03d] train/loss=%e', epoch, it,
-                            loss.detach().item())
+            if it % 40 == 0:
+                lr = scheduler.get_last_lr()[0]
+                logger.info('[%02d:%03d] train/loss=%e lr=%e', epoch, it,
+                            loss.detach().item(), lr)
 
         logger.info('[%0d] evaluate model', epoch + 1)
         eval_metrics = eval_fn(model)

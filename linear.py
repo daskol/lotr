@@ -1,9 +1,15 @@
-from typing import Optional
 from contextlib import contextmanager
+from enum import Enum
+from sys import version_info
+from typing import Optional
+
+if version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 import torch as T
 import torch.nn.functional as F
-from enum import Enum
 from torch.nn.parameter import Parameter
 
 from optimizer_KLS.Linear import Linear as KLSLinear
@@ -106,3 +112,116 @@ class AdaptiveLoRaLinear(T.nn.Module):
         if module.bias is not None:
             module.bias.data = linear.bias
         return module
+
+
+class LoTR(T.nn.Module):
+    """A container for storing common factors and private factors of an
+    addivitve term in Tucker-like form.
+
+    >>> layer = LoTR(3, 4, 2)
+    >>> clone = LoTR.from_lotr(layer)
+    """
+
+    def __init__(self, in_features: int, out_features: int, rank: int,
+                 device=None, dtype=None):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.rank = rank
+
+        # LoTR acts on a single input `x` as `L M R x` but since neural
+        # networks are usually applied to a batched input `X` the layer acts as
+        # `X (L M R)^T`. In other words, we store transposed `L`, `M`, and `R`.
+        self.lhs = Parameter(
+            T.empty((rank, out_features), device=device, dtype=dtype),
+            requires_grad=False,
+        )
+        self.mid = Parameter(
+            T.empty((rank, rank), device=device, dtype=dtype),
+            requires_grad=False,
+        )
+        self.rhs = Parameter(
+            T.empty((in_features, rank), device=device, dtype=dtype),
+            requires_grad=False,
+        )
+
+        # By default, there is not impact on output.
+        T.nn.init.normal_(self.lhs)
+        T.nn.init.zeros_(self.mid)
+        T.nn.init.normal_(self.rhs)
+
+    def __repr__(self) -> str:
+        args = ', '.join([
+            f'in_features={self.in_features}',
+            f'out_features={self.out_features}',
+            f'rank={self.rank}',
+        ])
+        return f'{self.__class__.__name__}({args})'
+
+    @property
+    def device(self):
+        return self.mid.device
+
+    @property
+    def dtype(self):
+        return self.mid.dtype
+
+    def forward(self, input: T.Tensor) -> T.Tensor:
+        hidden = input @ self.rhs
+        hidden = hidden @ self.mid
+        return hidden @ self.lhs
+
+    @classmethod
+    def from_lotr(cls, other: 'LoTR') -> Self:
+        """Construct a new container from existing one with left and right
+        factors reused.
+        """
+        self = cls(other.in_features, other.out_features, other.rank,
+                   other.device, other.dtype)
+        self.lhs = other.lhs
+        self.rhs = other.rhs
+        return self
+
+
+class LoTRLinear(T.nn.Module):
+    """A variant of linear layer with a trainable additive term in form of
+    tucker-like factorization and shared across multiple layer instances.
+    """
+
+    def __init__(self, in_features: int, out_features: int, rank: int = 1,
+                 bias: bool = True, device=None, dtype=None,
+                 scale: float = 1.0):
+        super().__init__()
+        self.scale = scale
+        self.linear = T.nn.Linear(in_features, out_features, bias, device,
+                                  dtype)
+        self.lotr = LoTR(in_features, out_features, rank, device, dtype)
+
+    @property
+    def in_features(self) -> int:
+        return self.linear.in_features
+
+    @property
+    def out_features(self) -> int:
+        return self.linear.out_features
+
+    @property
+    def rank(self) -> int:
+        return self.lotr.rank
+
+    def forward(self, input: T.Tensor) -> T.Tensor:
+        with T.no_grad():
+            intermediate = self.linear(input)
+        return intermediate + self.scale * self.lotr(input)
+
+    @classmethod
+    def from_linear(cls, linear: T.nn.Linear, lotr: 'LoTRLinear', **kwargs):
+        bias = linear.bias is not None
+        self = cls(linear.in_features, linear.out_features, lotr.rank, bias,
+                   **kwargs)
+        self.lotr = LoTR.from_lotr(lotr)
+        return self
+
+    def to_linear(self) -> T.nn.Linear:
+        """Merge an additive term to a basic weight matrix."""
+        raise NotImplementedError

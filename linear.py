@@ -216,9 +216,17 @@ class LoTRLinear(T.nn.Module):
 
     @classmethod
     def from_linear(cls, linear: T.nn.Linear, lotr: 'LoTRLinear', **kwargs):
+        """Creates linear layer with additive LoTR term from linear layer and
+        LoTR container.
+
+        It clones centeral core of LoTR container and shares left and right
+        matrices. Linear layer is not cloned and stays the same with the
+        exception that it is excluded from gradient computation graph.
+        """
         bias = linear.bias is not None
         self = cls(linear.in_features, linear.out_features, lotr.rank, bias,
                    **kwargs)
+        self.linear = linear.requires_grad_(False)
         self.lotr = LoTR.from_lotr(lotr)
         return self
 

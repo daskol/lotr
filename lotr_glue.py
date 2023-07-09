@@ -6,14 +6,17 @@ from argparse import ArgumentParser, Namespace
 from functools import partial
 from json import dumps
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch as T
 from datasets import load_dataset
 from evaluate import Metric
 from evaluate import load as load_metric
+from torch.utils.tensorboard import SummaryWriter
 from transformers import (AutoTokenizer, RobertaForSequenceClassification,
                           Trainer, TrainingArguments)
+from transformers.integrations import TensorBoardCallback
 
 from linear import LoTR, LoTRLinear
 from util import map_module
@@ -33,13 +36,20 @@ parser.add_argument('--enable-lotr', action='store_true',
                     help='use LoTR factorization')
 
 opt_iters = parser.add_argument_group('iteration options')
-opt_iters.add_argument('--batch-size', default=8, type=int)
+opt_iters.add_argument('--batch-size', default=16, type=int)
 opt_iters.add_argument('--num-epoches', default=1, type=int)
 
 opt_optim = parser.add_argument_group('optimizer options')
 opt_optim.add_argument('--init-rank', default=1, type=int)
 opt_optim.add_argument('--lr', default=2e-5, type=float,
                        help='learning rate (tau)')
+
+
+def to_json(val) -> str:
+    if isinstance(val, Path):
+        return str(val)
+    else:
+        raise TypeError(f'No rule to serialize {type(val)} to JSON.')
 
 
 def convert_lotr(module: T.nn.Module, path: str, lotr: LoTR):
@@ -80,9 +90,10 @@ def compute_metrics(metric: Metric, inputs):
     return metric.compute(predictions=predictions, references=references)
 
 
-def train(task: str, batch_size=8, num_epoches=1, enable_lotr=False, rank=1,
-          lr=2e-5):
-    logging.info('training options: %s', dumps(locals()))
+def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
+          lr=2e-5, log_dir: Optional[Path] = None):
+    logging.info('training options: %s',
+                 dumps(locals(), ensure_ascii=False, default=to_json))
 
     cache_dir = Path('cache')
     cache_dir.mkdir(exist_ok=True, parents=True)
@@ -119,7 +130,12 @@ def train(task: str, batch_size=8, num_epoches=1, enable_lotr=False, rank=1,
         for layer in model.roberta.encoder.layer:
             layer.attention.self.query.lotr.requires_grad_()
             layer.attention.self.value.lotr.requires_grad_()
-    print(model)
+
+    logging.info('common block:\n%s', model.roberta.encoder.layer[0])
+    logging.info('number of parameters: total=%d trainable=%d ratio=%.2f%%',
+                 model.num_parameters(),
+                 model.num_parameters(True),
+                 model.num_parameters(True) / model.num_parameters() * 100)
 
     if T.cuda.is_available():
         logger.info('move model to CUDA device')
@@ -152,6 +168,12 @@ def train(task: str, batch_size=8, num_epoches=1, enable_lotr=False, rank=1,
         push_to_hub=False,
     )
 
+    callbacks = []
+    if log_dir is not None:
+        tensorboard = SummaryWriter(log_dir)
+        tensorboard_callback = TensorBoardCallback(tensorboard)
+        callbacks.append(tensorboard_callback)
+
     trainer = Trainer(
         model=model,
         args=args,
@@ -159,6 +181,7 @@ def train(task: str, batch_size=8, num_epoches=1, enable_lotr=False, rank=1,
         eval_dataset=dataset['validation'],
         compute_metrics=partial(compute_metrics, metric),
         tokenizer=tokenizer,
+        callbacks=callbacks,
     )
 
     logger.info('evaluate metrics before training')

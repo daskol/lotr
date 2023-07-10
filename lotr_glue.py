@@ -18,7 +18,7 @@ from transformers import (AutoTokenizer, RobertaForSequenceClassification,
                           Trainer, TrainingArguments)
 from transformers.integrations import TensorBoardCallback
 
-from linear import LoTR, LoTRLinear
+from lotr import LoTR, LoTRLinear
 from util import map_module
 
 RE_CORRECTION = re.compile(

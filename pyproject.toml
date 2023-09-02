@@ -44,6 +44,15 @@ dependencies = [
 ]
 requires-python = ">=3.8,<4"
 
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+exp = [
+    "accelerate",
+    "datasets",
+    "evaluate",
+    "transformers",
+]
+
 [project.urls]
 Homepage = "https://doge.skoltech.ru/bershatsky/lotr"
 Repository = "https://doge.skoltech.ru/bershatsky/lotr.git"

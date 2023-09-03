@@ -21,6 +21,32 @@ from transformers.integrations import TensorBoardCallback
 from lotr import LoTR, LoTRLinear
 from util import map_module
 
+TASK_TO_HYPERPARAMS = {
+    'cola': (16, 1e-5),
+    'mnli': (16, 1e-5),
+    'mnli-mm': (16, 1e-5),
+    'mrpc': (16, 1e-5),
+    'qnli': (32, 1e-5),  # NOTE We used batch size 16 instead of 32.
+    'qqp': (32, 1e-5),
+    'rte': (16, 2e-5),
+    'sst2': (32, 2e-5),
+    'stsb': (16, 1e-5),
+    'wnli': (32, 1e-5),
+}
+
+TASK_TO_KEYS = {
+    'cola': ('sentence', ),
+    'mnli': ('premise', 'hypothesis'),
+    'mnli-mm': ('premise', 'hypothesis'),
+    'mrpc': ('sentence1', 'sentence2'),
+    'qnli': ('question', 'sentence'),
+    'qqp': ('question1', 'question2'),
+    'rte': ('sentence1', 'sentence2'),
+    'sst2': ('sentence', ),
+    'stsb': ('sentence1', 'sentence2'),
+    'wnli': ('sentence1', 'sentence2'),
+}
+
 RE_CORRECTION = re.compile(
     r'/roberta/encoder/layer/\d+/attention/self/(value|query)/correction/.*')
 
@@ -31,7 +57,6 @@ RE_PATTERNS = (RE_CORRECTION, RE_HEAD)
 logger = logging.getLogger(__name__)
 
 parser = ArgumentParser()
-parser.add_argument('task')
 parser.add_argument('--enable-lotr', action='store_true',
                     help='use LoTR factorization')
 
@@ -91,9 +116,13 @@ def compute_metrics(metric: Metric, inputs):
 
 
 def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
-          lr=2e-5, log_dir: Optional[Path] = None):
+          lr=2e-5, log_dir: Optional[Path] = None,
+          seed: Optional[int] = None):
     logging.info('training options: %s',
                  dumps(locals(), ensure_ascii=False, default=to_json))
+
+    if seed is not None:
+        T.manual_seed(seed)
 
     cache_dir = Path('cache')
     cache_dir.mkdir(exist_ok=True, parents=True)
@@ -101,9 +130,11 @@ def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
     logger.info('load and initialize tokenizer')
     tokenizer_path = 'roberta-base'
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer_keys = TASK_TO_KEYS[task]
 
     def tokenize(inp):
-        out = tokenizer(inp['sentence'],
+        args = [inp[key] for key in tokenizer_keys]
+        out = tokenizer(*args,
                         max_length=256,
                         padding='max_length',
                         truncation=True,
@@ -113,13 +144,21 @@ def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
         return out
 
     dataset = load_dataset('glue', task) \
-        .map(tokenize, batched=True, remove_columns=['sentence']) \
+        .map(tokenize, batched=True, remove_columns=tokenizer_keys) \
         .with_format('numpy')
+
+    # Load and configure model output head for a specific GLUE task.
+    if task in ('mnli', 'mnli-mm'):
+        num_labels = 3
+    elif task == 'stsb':
+        num_labels = 1
+    else:
+        num_labels = 2
 
     logger.info('load model from zoo')
     model_path = 'roberta-base'
     model = RobertaForSequenceClassification \
-        .from_pretrained(model_path) \
+        .from_pretrained(model_path, num_labels=num_labels) \
         .requires_grad_(False)
     if enable_lotr:
         logger.info('patch model to add LoTR term')
@@ -189,7 +228,7 @@ def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
     logger.info('metrics: %s', eval_metrics)
 
     logger.info('enter training loop: noepoches=%d', num_epoches)
-    trainer.train()
+    return trainer.train()
 
 
 def main(args: Namespace):
@@ -200,4 +239,5 @@ def main(args: Namespace):
 
 
 if __name__ == '__main__':
+    parser.add_argument('task')  # Add task argument to a generic parser.
     main(parser.parse_args())

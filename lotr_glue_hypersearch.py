@@ -5,6 +5,7 @@ from argparse import Namespace
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 from optuna import Trial, create_study
 from optuna.samplers import GridSampler
 
@@ -52,11 +53,14 @@ def main(args: Namespace):
     if not args.enable_lotr:
         raise NotImplementedError('Search only LoTR hyperparameters.')
 
+    space_size = np.product([len(v) for v in SEARCH_SPACE.values()])
+    logging.info('search space size is %d', space_size)
+
     study = create_study(study_name='roberta/glue/grid-search/small',
                          storage='sqlite:///iclr24.sqlite',
                          sampler=GridSampler(SEARCH_SPACE),
                          load_if_exists=True)
-    study.optimize(partial(objective, args), n_trials=200)
+    study.optimize(partial(objective, args), n_trials=space_size)
 
 
 if __name__ == '__main__':

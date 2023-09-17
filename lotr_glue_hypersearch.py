@@ -17,14 +17,7 @@ SEARCH_SPACE = {
     'lr': [1e-6, 5e-5, 1e-5, 5e-4, 1e-4, 5e-3, 1e-3],
     'rank': [1, 2, 5, 10, 16, 32, 64, 128, 256, 512],
     'seed': [42, 3705, 0x12c946425095e587],
-    'task': [
-        'cola',
-        'mrpc',
-        'rte',
-        'sst2',
-        'stsb',
-        'wnli',
-    ],
+    'task': ['cola'],
 }
 
 
@@ -56,7 +49,7 @@ def main(args: Namespace):
     space_size = np.product([len(v) for v in SEARCH_SPACE.values()])
     logging.info('search space size is %d', space_size)
 
-    study = create_study(study_name='roberta/glue/grid-search/small',
+    study = create_study(study_name='roberta/glue/grid-search/cola',
                          storage='sqlite:///iclr24.sqlite',
                          sampler=GridSampler(SEARCH_SPACE),
                          load_if_exists=True)

@@ -150,9 +150,9 @@ class LoTRLinear(T.nn.Module):
         return self.lotr.rank
 
     def forward(self, input: T.Tensor) -> T.Tensor:
-        with T.no_grad():
-            intermediate = self.linear(input)
-        return intermediate + self.scale * self.lotr(input)
+        assert not self.linear.weight.requires_grad, \
+            'Weights of kernel must be freezed.'
+        return self.linear(input) + self.scale * self.lotr(input)
 
     @classmethod
     def from_linear(cls, linear: T.nn.Linear, lotr: 'LoTRLinear', **kwargs):

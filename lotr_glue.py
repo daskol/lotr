@@ -47,6 +47,8 @@ TASK_TO_KEYS = {
     'wnli': ('sentence1', 'sentence2'),
 }
 
+TASKS = [*sorted(TASK_TO_KEYS.keys())]
+
 RE_CORRECTION = re.compile(
     r'/roberta/encoder/layer/\d+/attention/self/(value|query)/correction/.*')
 
@@ -115,9 +117,9 @@ def compute_metrics(metric: Metric, inputs):
     return metric.compute(predictions=predictions, references=references)
 
 
-def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
-          lr=2e-5, log_dir: Optional[Path] = None,
-          seed: Optional[int] = None):
+def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
+                 rank=1, lr=2e-5, log_dir: Optional[Path] = None,
+                 seed: Optional[int] = None):
     logging.info('training options: %s',
                  dumps(locals(), ensure_ascii=False, default=to_json))
 
@@ -213,7 +215,7 @@ def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
         tensorboard_callback = TensorBoardCallback(tensorboard)
         callbacks.append(tensorboard_callback)
 
-    trainer = Trainer(
+    return Trainer(
         model=model,
         args=args,
         train_dataset=dataset['train'],
@@ -223,10 +225,15 @@ def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
         callbacks=callbacks,
     )
 
+
+def train(task: str, batch_size=16, num_epoches=1, enable_lotr=False, rank=1,
+          lr=2e-5, log_dir: Optional[Path] = None,
+          seed: Optional[int] = None):
+    trainer = make_trainer(task, batch_size, num_epoches, enable_lotr, rank,
+                           lr, log_dir, seed)
     logger.info('evaluate metrics before training')
     eval_metrics = trainer.evaluate()
     logger.info('metrics: %s', eval_metrics)
-
     logger.info('enter training loop: noepoches=%d', num_epoches)
     return trainer.train()
 

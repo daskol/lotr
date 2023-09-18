@@ -1,5 +1,6 @@
 from collections import defaultdict
 from math import sqrt
+from itertools import chain
 from typing import Any
 
 import torch as T
@@ -195,6 +196,11 @@ class LRSchedulerList(LRScheduler):
 
     def __init__(self, schedulers: list[LRScheduler]):
         self.schedulers = schedulers
+
+    def get_last_lr(self):
+        lrs = chain.from_iterable(scheduler.get_last_lr()
+                                  for scheduler in self.schedulers)
+        return [*lrs]
 
     def step(self, epoch=None):
         for scheduler in self.schedulers:

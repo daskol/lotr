@@ -89,3 +89,9 @@ class TestOptimizerList:
         for optimizer in opt.optimizers:
             lrs = np.array([x['lr'] for x in optimizer.param_groups])
             assert_array_less(0, lrs)
+
+        # HuggingFace's transformers requires this method for logging learning
+        # rate at the end of epoch.
+        lrs = scheduler.get_last_lr()
+        assert isinstance(lrs, list)
+        assert len(lrs) > 0

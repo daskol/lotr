@@ -6,6 +6,7 @@ from argparse import ArgumentParser, Namespace
 from functools import partial
 from json import dumps
 from pathlib import Path
+from pprint import pprint
 from typing import Optional
 
 import numpy as np
@@ -15,11 +16,18 @@ from evaluate import Metric
 from evaluate import load as load_metric
 from torch.utils.tensorboard import SummaryWriter
 from transformers import (AutoTokenizer, RobertaForSequenceClassification,
-                          Trainer, TrainingArguments)
+                          Trainer, TrainingArguments,
+                          get_polynomial_decay_schedule_with_warmup)
 from transformers.integrations import TensorBoardCallback
 
-from lotr import LoTR, LoTRLinear
+from low_rank import (LowRankAdamW, LowRankLinear, LRSchedulerList,
+                      OptimizerList)
 from util import map_module
+
+RE_PARAM_LOW_RANK = re.compile(r'roberta\.encoder\.layer\.\d+\.'
+                               r'attention\.self\.(value|query)\.correction')
+
+RE_PARAM_CLASSIFIER = re.compile(r'classifier\..*$')
 
 TASK_TO_HYPERPARAMS = {
     'cola': (16, 1e-5),
@@ -79,17 +87,16 @@ def to_json(val) -> str:
         raise TypeError(f'No rule to serialize {type(val)} to JSON.')
 
 
-def convert_lotr(module: T.nn.Module, path: str, lotr: LoTR):
+def convert_low_rank(module: T.nn.Module, path: str):
     if not isinstance(module, T.nn.Linear):
         raise ValueError('Only linear layer can be converted: '
                          f'type={type(module)}.')
-    return LoTRLinear.from_linear(module, lotr)
+    return LowRankLinear.from_linear(module)
 
 
-def convert_model(model, lotr: LoTR):
+def convert_model(model):
     return map_module(
-        model,
-        partial(convert_lotr, lotr=lotr),
+        model, partial(convert_low_rank),
         r'/roberta/encoder/layer/\d+/attention/self/(value|query)')
 
 
@@ -115,6 +122,75 @@ def compute_metrics(metric: Metric, inputs):
     else:
         predictions = predictions[..., 0]
     return metric.compute(predictions=predictions, references=references)
+
+
+def instantiate_model(model_path='roberta-base', enable_lotr=True,
+                      num_labels=2) -> RobertaForSequenceClassification:
+    model = RobertaForSequenceClassification \
+        .from_pretrained(model_path, num_labels=num_labels) \
+        .requires_grad_(False)
+    if enable_lotr:
+        # logger.info('patch model to add correction term')
+        model = convert_model(model)
+        model = mask_weights(model)
+        model.classifier.requires_grad_(True)
+        for layer in model.roberta.encoder.layer:
+            layer.attention.self.query.correction.requires_grad_()
+            layer.attention.self.value.correction.requires_grad_()
+    return model
+
+
+def instantiate_optimizer(model, lr, rank, batch_size, num_epoches,
+                          num_samples):
+
+    def filter_params(pattern):
+        return [(name, param) for name, param in model.named_parameters()
+                if param.requires_grad and pattern.match(name)]
+
+    def print_params(named_params, label=None):
+        if label is not None:
+            print(f'{label}:', end=' ')
+        print('total', len(named_params), 'parameters:')
+        names = [k for k, v in named_params]
+        if len(names) > 5:
+            names = names[:4] + ['...']
+        pprint(names)
+
+    def slice_params(named_params):
+        return (v for k, v in named_params)
+
+    named_params_cls = filter_params(RE_PARAM_CLASSIFIER)
+    named_params_lr = filter_params(RE_PARAM_LOW_RANK)
+    params_cls = slice_params(named_params_cls)
+    params_lr = slice_params(named_params_lr)
+    print_params(named_params_cls)
+    print_params(named_params_lr)
+
+    opt_kwargs = {
+        'lr': lr,
+        'betas': (0.9, 0.98),
+        'eps': 1e-6,
+        'weight_decay': 0.1
+    }
+
+    opt_cls = T.optim.AdamW(params_cls, **opt_kwargs)
+    opt_lr = LowRankAdamW(params_lr, rank=rank, **opt_kwargs)
+    opt = OptimizerList([opt_cls, opt_lr])
+
+    # In reference fine-tuning report for RoBERTa on GLUE.
+    noepoches = 10
+    warmup_steps = int(0.06 * num_samples * noepoches / batch_size)
+    total_steps = num_samples * num_epoches / batch_size
+
+    def make_scheduler(opt: T.optim.Optimizer):
+        return get_polynomial_decay_schedule_with_warmup(
+            opt, warmup_steps, total_steps)
+
+    scheduler_cls = make_scheduler(opt_cls)
+    scheduler_lr = make_scheduler(opt_lr)
+    scheduler = LRSchedulerList([scheduler_cls, scheduler_lr])
+
+    return opt, scheduler
 
 
 def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
@@ -159,18 +235,7 @@ def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
 
     logger.info('load model from zoo')
     model_path = 'roberta-base'
-    model = RobertaForSequenceClassification \
-        .from_pretrained(model_path, num_labels=num_labels) \
-        .requires_grad_(False)
-    if enable_lotr:
-        logger.info('patch model to add LoTR term')
-        lotr = LoTR(model.config.hidden_size, model.config.hidden_size, rank)
-        model = convert_model(model, lotr)
-        model = mask_weights(model)
-        model.classifier.requires_grad_(True)
-        for layer in model.roberta.encoder.layer:
-            layer.attention.self.query.lotr.requires_grad_()
-            layer.attention.self.value.lotr.requires_grad_()
+    model = instantiate_model(model_path, enable_lotr, num_labels)
 
     logging.info('common block:\n%s', model.roberta.encoder.layer[0])
     logging.info('number of parameters: total=%d trainable=%d ratio=%.2f%%',
@@ -185,11 +250,14 @@ def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
     logger.info('load evaluation metrics')
     metric = load_metric('glue', task)
 
-    logger.info('instantiate trainer')
+    logger.info('instantiate a list of optimizers and schedulers')
     noepoches = 10
-    warmup_steps = int(0.06 * len(dataset['train']) * noepoches / batch_size)
-    model_dir = Path('model')
+    num_samples = len(dataset['train'])
+    opt, scheduler = instantiate_optimizer(model, lr, rank, batch_size,
+                                           num_epoches, num_samples)
 
+    logger.info('instantiate trainer')
+    model_dir = Path('model')
     args = TrainingArguments(
         output_dir=str(model_dir / f'glue-{task}'),
         evaluation_strategy='epoch',
@@ -199,13 +267,6 @@ def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
         save_strategy='no',
         logging_strategy='epoch',
         log_level='warning',
-        learning_rate=lr,
-        weight_decay=0.1,
-        adam_beta1=0.9,
-        adam_beta2=0.98,
-        adam_epsilon=1e-6,
-        lr_scheduler_type='polynomial',
-        warmup_steps=warmup_steps,
         push_to_hub=False,
     )
 
@@ -218,6 +279,7 @@ def make_trainer(task: str, batch_size=16, num_epoches=1, enable_lotr=False,
     return Trainer(
         model=model,
         args=args,
+        optimizers=(opt, scheduler),
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
         compute_metrics=partial(compute_metrics, metric),

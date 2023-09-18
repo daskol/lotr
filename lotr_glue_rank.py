@@ -9,15 +9,16 @@ additive correction in LoTR.
             cola
 """
 
+import logging
 from argparse import Namespace
 from functools import partial
 from pathlib import Path
-import logging
 
-from lotr_glue import make_trainer, parser, TASKS
 import numpy as np
 from optuna import Trial, create_study
 from optuna.samplers import GridSampler
+
+from lotr_glue import TASKS, make_trainer, parser
 
 parser.add_argument('--log-dir', default=Path('log'), type=Path)
 parser.add_argument('task', default='cola', choices=TASKS)

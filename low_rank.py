@@ -1,7 +1,10 @@
+from collections import defaultdict
 from math import sqrt
+from typing import Any
 
 import torch as T
 from torch.nn.parameter import Parameter
+from torch.optim.lr_scheduler import LRScheduler
 
 __all__ = ('LowRankLinear',)
 
@@ -143,6 +146,15 @@ class LowRankAdam(LowRankMixin, T.optim.Adam):
         super().__init__(params, rank=rank, **kwargs)
 
 
+class LowRankAdamW(LowRankMixin, T.optim.AdamW):
+    """A variant of AdamW optimizer with an additional step for projection on
+    low-rank matrix manifold.
+    """
+
+    def __init__(self, params, *, rank=1, **kwargs):
+        super().__init__(params, rank=rank, **kwargs)
+
+
 class LowRankSGD(LowRankMixin, T.optim.SGD):
     """A variant of SGD optimizer with an additional step for projection on
     low-rank matrix manifold.
@@ -150,3 +162,40 @@ class LowRankSGD(LowRankMixin, T.optim.SGD):
 
     def __init__(self, params, *args, rank=1, **kwargs):
         super().__init__(params, *args, rank=rank, **kwargs)
+
+
+class OptimizerList(T.optim.Optimizer):
+
+    def __init__(self, optimizers: list[T.optim.Optimizer]):
+        # Do not call __init__ of parent type. We just need to mock the
+        # optimizer methods and attributes.
+        self.defaults = {}
+        self.param_groups = {}
+        self.stete = defaultdict(dict)
+        self.optimizers = list(optimizers)
+
+    def step(self, closure=None):
+        assert closure is None, 'Not implemented suppor for closure.'
+        for optimizer in self.optimizers:
+            optimizer.step()
+
+    def state_dict(self):
+        return [opt.state_dict() for opt in self.optimizers]
+
+    def load_state_dict(self, state: list[Any]):
+        for opt, opt_state in zip(self.optimizers, state):
+            opt.load_state_dict(opt_state)
+
+    def zero_grad(self, set_to_none: bool = True):
+        for optimizer in self.optimizers:
+            optimizer.zero_grad(set_to_none)
+
+
+class LRSchedulerList(LRScheduler):
+
+    def __init__(self, schedulers: list[LRScheduler]):
+        self.schedulers = schedulers
+
+    def step(self, epoch=None):
+        for scheduler in self.schedulers:
+            scheduler.step(epoch)

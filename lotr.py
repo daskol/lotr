@@ -7,7 +7,6 @@ else:
 
 import torch as T
 from torch.nn.parameter import Parameter
-from torch.cuda.amp import custom_fwd
 
 __all__ = ('LoTR', 'LoTRLinear')
 
@@ -64,12 +63,10 @@ class LoTR(T.nn.Module):
     def dtype(self):
         return self.mid.dtype
 
-    @custom_fwd
     def forward(self, input: T.Tensor) -> T.Tensor:
-        with T.autocast('cuda'):
-            hidden = input @ self.rhs
-            hidden = hidden @ self.mid
-            return hidden @ self.lhs
+        hidden = input @ self.rhs
+        hidden = hidden @ self.mid
+        return hidden @ self.lhs
 
     @classmethod
     def from_lotr(cls, other: 'LoTR') -> Self:

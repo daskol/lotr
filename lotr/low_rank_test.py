@@ -4,8 +4,8 @@ import torch as T
 from numpy.testing import assert_array_equal, assert_array_less
 from transformers import get_polynomial_decay_schedule_with_warmup
 
-from low_rank import (LowRankAdam, LowRankLinear, LowRankSGD, LRSchedulerList,
-                      OptimizerList)
+from lotr.low_rank import (LowRankAdam, LowRankLinear, LowRankSGD,
+                           LRSchedulerList, OptimizerList)
 
 
 class TestLowRankLinear:

@@ -10,7 +10,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet
 
-from tb import glob_combiner, read_scalars
+from lotr.tb import glob_combiner, read_scalars
 
 RE_METRIC = (r'(eval|train)/'
              r'(accuracy|epoch|f1|learning_rate|loss|matthews_correlation'

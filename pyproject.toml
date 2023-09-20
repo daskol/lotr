@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skoltech-lotr"
-version = "0.0.0"
+version = "0.0.1"
 description = "Lord of the Rank."
 license = {text = "MIT"}
 authors = [
@@ -78,8 +78,14 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.setuptools]
 include-package-data = false
 platforms = ["Linux"]
-zip-safe = false
-py-modules = ["lotr"]
+zip-safe = true
+
+[tool.setuptools.packages.find]
+include = ["lotr*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+lotr = ["py.typed"]
 
 [tool.yapf]
 based_on_style = "pep8"

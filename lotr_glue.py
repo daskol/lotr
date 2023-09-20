@@ -20,9 +20,8 @@ from transformers import (AutoTokenizer, RobertaForSequenceClassification,
                           get_polynomial_decay_schedule_with_warmup)
 from transformers.integrations import TensorBoardCallback
 
-from low_rank import (LowRankAdamW, LowRankLinear, LRSchedulerList,
-                      OptimizerList)
-from util import map_module
+from lotr import (LowRankAdamW, LowRankLinear, LRSchedulerList, OptimizerList,
+                  map_module)
 
 RE_PARAM_LOW_RANK = re.compile(r'roberta\.encoder\.layer\.\d+\.'
                                r'attention\.self\.(value|query)\.correction')

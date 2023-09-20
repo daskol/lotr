@@ -1,6 +1,6 @@
 from collections import defaultdict
-from math import sqrt
 from itertools import chain
+from math import sqrt
 from typing import Any
 
 import torch as T

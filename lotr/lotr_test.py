@@ -1,6 +1,6 @@
 import torch as T
 
-from lotr import LoTR, LoTRLinear
+from lotr.lotr import LoTR, LoTRLinear
 
 
 class TestLoTR:

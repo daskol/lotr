@@ -1,6 +1,6 @@
 import torch as T
 
-from lora import LoRALinear
+from lotr.lora import LoRALinear
 
 
 class TestLoRALinear:

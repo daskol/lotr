@@ -1,8 +1,7 @@
-import logging
 import re
 from functools import wraps
 from re import Pattern
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, dict, Optional
 
 import numpy as np
 import torch as T
@@ -124,7 +123,7 @@ def sizeof(module: T.nn.Module):
     return value
 
 
-def flatten_module(module: T.nn.Module, regexp=None) -> Dict[str, T.nn.Module]:
+def flatten_module(module: T.nn.Module, regexp=None) -> dict[str, T.nn.Module]:
     modules = {}
     map_module(module, lambda x, y: modules.update(**{y: x}) or x, regexp)
     return modules

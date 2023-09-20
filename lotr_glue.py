@@ -75,7 +75,7 @@ opt_iters.add_argument('--batch-size', default=16, type=int)
 opt_iters.add_argument('--num-epoches', default=1, type=int)
 
 opt_optim = parser.add_argument_group('optimizer options')
-opt_optim.add_argument('--init-rank', default=1, type=int)
+opt_optim.add_argument('--rank', default=1, type=int)
 opt_optim.add_argument('--lr', default=2e-5, type=float,
                        help='learning rate (tau)')
 
@@ -304,7 +304,7 @@ def main(args: Namespace):
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.INFO)
     train(args.task, args.batch_size, args.num_epoches, args.enable_lotr,
-          args.init_rank, args.lr)
+          args.rank, args.lr)
 
 
 if __name__ == '__main__':

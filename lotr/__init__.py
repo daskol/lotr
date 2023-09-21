@@ -5,9 +5,9 @@ implementation of concurrent approaches like LoRA.
 
 from lotr.lora import LoRALinear
 from lotr.lotr import LoTR, LoTRLinear
-from lotr.low_rank import (LowRankAdam, LowRankAdamW, LowRankLinear,
-                           LowRankMixin, LowRankSGD, LRScheduler,
-                           LRSchedulerList, OptimizerList)
+from lotr.low_rank import LowRankLinear
+from lotr.optim import (LowRankAdam, LowRankAdamW, LowRankMixin, LowRankSGD,
+                        LRScheduler, LRSchedulerList, OptimizerList)
 from lotr.util import map_module
 
 __all__ = ('LoRALinear', 'LoTR', 'LoTRLinear', 'LowRankAdam', 'LowRankAdamW',

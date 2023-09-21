@@ -133,9 +133,11 @@ class LoTRLinear(T.nn.Module):
                  scale: float = 1.0):
         super().__init__()
         self.scale = scale
-        self.linear = T.nn.Linear(in_features, out_features, bias, device,
-                                  dtype)
-        self.lotr = LoTR(in_features, out_features, rank, device, dtype)
+
+        opts = {'device': device, 'dtype': dtype}
+        self.linear = T.nn.Linear(in_features, out_features, bias, **opts)
+        self.linear.weight.requires_grad_(False)
+        self.lotr = LoTR(in_features, out_features, rank, **opts)
 
     @property
     def in_features(self) -> int:

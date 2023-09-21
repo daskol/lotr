@@ -56,7 +56,8 @@ class TestLoTRLinear:
 
     def test_forward_backward(self):
         layer = LoTRLinear(3, 4, 2)
-        layer.requires_grad_()
+        assert not layer.linear.weight.requires_grad
+        assert layer.linear.bias.requires_grad
         # Make gradient step.
         opt = T.optim.SGD(layer.parameters(), 1e-3)
         opt.zero_grad()

@@ -1,7 +1,7 @@
 import re
 from functools import wraps
 from re import Pattern
-from typing import Callable, dict, Optional
+from typing import Callable, Optional
 
 import numpy as np
 import torch as T

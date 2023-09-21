@@ -128,8 +128,8 @@ dmypy.json
 cython_debug/
 
 # Add symlinks to dependency packages to simplify dependency management.
-/loralib
-/optimizer_KLS
+/exp/dlrt/loralib
+/exp/dlrt/optimizer_KLS
 
 # Ignore tensorboard summary.
 /log

@@ -132,7 +132,7 @@ class LoTRLinear(T.nn.Module):
                  bias: bool = True, device=None, dtype=None,
                  scale: float = 1.0):
         super().__init__()
-        self.scale = scale
+        self.scale = scale / rank
 
         opts = {'device': device, 'dtype': dtype}
         self.linear = T.nn.Linear(in_features, out_features, bias, **opts)

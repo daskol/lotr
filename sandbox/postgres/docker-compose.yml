@@ -1,0 +1,16 @@
+version: '3.6'
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - 'POSTGRES_PASSWORD_FILE=/run/secrets/postgres-passwd'
+    ports:
+      - '0.0.0.0:5432:5432'
+    volumes:
+      - './data:/var/lib/postgresql/data'
+    secrets:
+      - 'postgres-passwd'
+secrets:
+  postgres-passwd:
+    file: '.postgres-passwd'

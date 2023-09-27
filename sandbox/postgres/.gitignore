@@ -1,0 +1,2 @@
+# Ignore secret files.
+.postgres-passwd

@@ -1,0 +1,11 @@
+version: '3.6'
+services:
+  tb:
+    image: tensorboard
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '0.0.0.0:6006:6006'
+    volumes:
+      - './data:/data/tensorboard:ro'

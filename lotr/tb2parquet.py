@@ -23,8 +23,8 @@ parser.add_argument('output', type=Path, help='path to output parquet file')
 
 
 def read_logs(log_dir: Path, pattern: str) -> pd.DataFrame:
-    names = ['task', 'lr', 'rank', 'seed']
-    with glob_combiner('*/*/*/*/*.tfevents.*', names) as combiner:
+    names = ['adapter', 'task', 'lr', 'rank', 'seed']
+    with glob_combiner('*/*/*/*/*/*.tfevents.*', names) as combiner:
         frame = combiner(read_scalars, log_dir, pattern)
     frame['lr'] = frame.lr.astype(float)
     frame['rank'] = frame['rank'].astype(int)

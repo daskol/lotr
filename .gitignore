@@ -133,3 +133,6 @@ cython_debug/
 
 # Ignore tensorboard summary.
 /log
+
+# Ignore all Arrow Parquet files.
+*.parquet

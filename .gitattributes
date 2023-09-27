@@ -1,0 +1,3 @@
+# Mark all images as binary.
+*.pgf   binary
+*.png   binary

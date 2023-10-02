@@ -1,19 +1,18 @@
 """Module tensorboard provides a small set of routines for data extraction out
 of tensorboard summary data.
 """
+
 import re
-
-import pandas as pd
-
-from contextlib2 import contextmanager
 from itertools import count, zip_longest
 from operator import attrgetter
 from os import PathLike
 from pathlib import Path
 from typing import Any, Optional, Type
 
+import pandas as pd
+from contextlib2 import contextmanager
 from google.protobuf.message import Message
-from tensorboard import dataclass_compat, data_compat
+from tensorboard import data_compat, dataclass_compat
 from tensorboard.compat.proto import types_pb2
 from tensorboard.compat.proto.event_pb2 import Event
 from tensorboard.compat.tensorflow_stub import errors, pywrap_tensorflow

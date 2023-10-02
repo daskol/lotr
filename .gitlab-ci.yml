@@ -1,0 +1,52 @@
+---
+
+stages:
+  - image
+  - check
+  - test
+  - publish
+
+image-sandbox:
+  image: docker:20.10.16
+  stage: image
+  script:
+    - echo $CI_REGISTRY_PASSWORD | docker -D login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:latest
+  variables:
+    DOCKER_BUILDKIT: '1'
+
+check-style:
+  image: $CI_REGISTRY_IMAGE
+  stage: check
+  needs: ['image-sandbox']
+  script:
+    - flake8 .
+    - isort -c --diff lotr
+    - (cd exp/dlrt && isort -c --diff -p optimizer_KLS .)
+    - (cd exp/lotr && isort -c --diff .)
+
+test:
+  image: $CI_REGISTRY_IMAGE
+  stage: test
+  needs: ['image-sandbox']
+  script:
+    - echo $PYTHONPATH
+    - pytest -s -vv
+  variables:
+    PYTHONPATH: $PWD
+
+pypi:
+  image: $CI_REGISTRY_IMAGE
+  stage: publish
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /v\d+(\.\d+)*/'
+  needs: ['check-style', 'test']
+  variables:
+    PYPI_URL: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi'
+    TWINE_CERT: '${CI_SERVER_TLS_CA_FILE}'
+    TWINE_PASSWORD: '${CI_JOB_TOKEN}'
+    TWINE_USERNAME: 'gitlab-ci-token'
+  script:
+    - python -m build -nw .
+    - python -m twine upload --repository-url $PYPI_URL dist/*.whl

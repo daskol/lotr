@@ -136,3 +136,7 @@ cython_debug/
 
 # Ignore all Arrow Parquet files.
 *.parquet
+
+# Ignore SQLite database files with Optuna experiments.
+*.sqlite
+*.sqlite3

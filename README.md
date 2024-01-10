@@ -34,3 +34,24 @@ The lat directory is random seed used to run an experiment.
 
 Note that the requirements above are involuntary since there is no
 full-featured machine learning experiment management software.
+
+### Convertion to Arrow Parquet
+
+TensorBoard `tfvents`-file are quite large files which take noticably long time
+to read and load. So we convert `tfevents`-files to `parquet`-files with the
+following command.
+
+```shell
+python -m lotr.tb2parquet log/glue data/glue.parquet \
+    --names model method task lr rank seed \
+```
+
+Now, one can read a single `parquet`-file with all time series as follows.
+
+```python
+import pandas as pd
+df = pd.read_parquet('data/glue.parquet')
+```
+
+To be more specific, 20Mb of `tfevents`-file are converted to 200Kb of
+`parquet`-file.

@@ -1,0 +1,4 @@
+model,        kind,method,   params,mnli,sst2,mrpc,cola,qnli,qqp,rte,stsb
+roberta-large,mean,fine-tune,350e6,90.2,96.4,90.9,68.0,94.7,92.2,86.6,92.4
+roberta-large,mean,lora,       8e5,90.6,96.2,90.9,68.2,94.9,91.6,87.4,92.6
+roberta-large,std,lora,,0.2,0.5,1.2,1.9,0.3,0.1,2.5,0.2

@@ -1,0 +1,9 @@
+model,value,method,params,mnli,sst2,mrpc,cola,qnli,qqp,rte,stsb
+roberta-base,mean,fine-tune,125e3,87.6,94.8,90.2,63.6,92.8,91.9,78.7,91.2
+roberta-base,mean,bitfit,1e5,84.7,93.7,92.7,62.0,91.8,84.0,81.5,90.8
+roberta-base,mean,adapter-d,3e5,87.1,94.2,88.5,60.8,93.1,90.2,71.5,89.7
+roberta-base,mean,adapter-d,9e5,87.3,94.7,88.4,62.6,93.0,90.6,75.9,90.3
+roberta-base,mean,lora,3e5,87.5,95.1,89.7,63.4,93.3,90.8,86.6,91.5
+roberta-base,std,adapter-d,,0.0,0.1,1.1,0.4,0.1,0.0,2.7,0.3
+roberta-base,std,adapter-d,,0.1,0.3,0.1,0.9,0.2,0.0,2.2,0.1
+roberta-base,std,lora,,0.3,0.2,0.7,1.2,0.3,0.1,0.7,0.2

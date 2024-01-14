@@ -45,7 +45,7 @@ dependencies = [
 requires-python = ">=3.8,<4"
 
 [project.optional-dependencies]
-dev = ["flake8", "isort", "pytest>=7"]
+dev = ["flake8", "isort", "pytest>=7", "pytest-benchmark>=4"]
 exp = [
     "accelerate",
     "datasets",
@@ -75,6 +75,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
+python_classes = ["Test*", "*Benchmark"]
 
 [tool.setuptools]
 include-package-data = false

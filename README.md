@@ -1,17 +1,35 @@
 # LoTR: Low Tensor Rank Adaptation of Large Language Models
 
-*Parameter efficient fine-tuning*
+*Low Tensor Rank adaptation of large language models*
 
 ## Overview
 
-An attempt to introduce dynamic rank in [LoRa][1] as it did in \[[2][2]\] and
-improve optimization algorithm in general.
+This repository is the original implementation of LoTR ([arXiv:2402.01376][4]),
+a novel approach for parameter-efficient fine-tuning of LLMs which represents a
+gradient update to parameters in a form of tensor decomposition. Low-rank
+adapter for each layer is constructed as a product of three matrices, and
+tensor structure arises from sharing left and right multipliers of this product
+among layers. Simultaneous compression of a sequence of layers with low-rank
+tensor representation allows LoTR to archive even better parameter efficiency
+then LoRA especially for deep models. Moreover, the core tensor does not depend
+on original weight dimension and can be made arbitrary small, which allows for
+extremely cheap and fast downstream fine-tuning.
 
-![Comparison of LoRA against LoTR][3]
+```bibtex
+@misc{bershatsky2024lotr,
+  title         = {{LoTR}: Low Tensor Rank Weight Adaptation},
+  author        = {Daniel Bershatsky and Daria Cherniuk and Talgat Daulbaev and Aleksandr Mikhalev and Ivan Oseledets},
+  year          = {2024},
+  eprint        = {2402.01376},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL}
+}
+```
 
 [1]: https://arxiv.org/abs/2106.09685
 [2]: https://arxiv.org/abs/2205.13571
 [3]: ./doc/iclr2024/fig/parameter-efficiency.png
+[4]: https://arxiv.org/abs/2402.01376
 
 ## Experiments
 

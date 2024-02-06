@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite our as below."
+authors:
+- family-names: "Bershatsky"
+  given-names: "Daniel"
+  orcid: "https://orcid.org/0000-0001-8917-8187"
+- family-names: "Cherniuk"
+  given-names: "Daria"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+- family-names: "Daulbaev"
+  given-names: "Talgat"
+  orcid: "https://orcid.org/0009-0000-3364-8979"
+- family-names: "Mikhalev"
+  given-names: "Aleksandr"
+  orcid: "https://orcid.org/0000-0002-9274-7237"
+- family-names: "Oseledets"
+  given-names: "Ivan"
+  orcid: "https://orcid.org/0000-0003-2071-2163"
+title: "LoTR: Low Tensor Rank Weight Adaptation"
+version: 0.1.0
+date-released: 2024-02-02
+url: "https://github.com/skolai/lotr"
+preferred-citation:
+  type: generic
+  status: submitted
+  title: "LoTR: Low Tensor Rank Weight Adaptation"
+  authors:
+  - family-names: "Bershatsky"
+    given-names: "Daniel"
+    orcid: "https://orcid.org/0000-0001-8917-8187"
+  - family-names: "Cherniuk"
+    given-names: "Daria"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+  - family-names: "Daulbaev"
+    given-names: "Talgat"
+    orcid: "https://orcid.org/0009-0000-3364-8979"
+  - family-names: "Mikhalev"
+    given-names: "Aleksandr"
+    orcid: "https://orcid.org/0000-0002-9274-7237"
+  - family-names: "Oseledets"
+    given-names: "Ivan"
+    orcid: "https://orcid.org/0000-0003-2071-2163"
+  doi: 10.48550/arXiv.2402.01376
+  date-published: 2024-02-02
+  identifiers:
+  - type: other
+    value: "2402.01376"
+    description: The ArXiv preprint of the paper

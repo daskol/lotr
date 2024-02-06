@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skoltech-lotr"
-version = "0.0.1"
+version = "0.1.0"
 description = "Lord of the Rank."
 license = {text = "Apache-2.0"}
 authors = [

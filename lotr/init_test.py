@@ -1,10 +1,8 @@
 import re
-from dataclasses import dataclass
 from operator import attrgetter
 from typing import Any
 
 import numpy as np
-import torch as T
 from numpy.testing import assert_array_equal
 from transformers import RobertaForSequenceClassification
 

@@ -45,7 +45,7 @@ dependencies = [
 requires-python = ">=3.8,<4"
 
 [project.optional-dependencies]
-dev = ["flake8", "isort", "pytest>=7", "pytest-benchmark>=4"]
+dev = ["isort", "pytest>=7", "pytest-benchmark>=4", "ruff~=0.4"]
 exp = [
     "accelerate",
     "datasets",
@@ -76,6 +76,9 @@ markers = [
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
 python_classes = ["Test*", "*Benchmark"]
+
+[tool.ruff]
+include = ["benchmark/*.py", "lotr/**/*.py", "lotr/**/*.pyi", "pyproject.toml"]
 
 [tool.setuptools]
 include-package-data = false
